@@ -2,7 +2,6 @@ import copy
 from typing import Dict, Optional, Set
 
 import numpy as np
-
 from go_base import Group, find_reached, place_stones
 from utils import BLACK, BOARD_SIZE, EMPTY, FILL, MISSING_GROUP_ID, NEIGHBORS, WHITE
 
@@ -90,9 +89,20 @@ class LibertyTracker:
             else:
                 empty_neighbors.add(n)
 
+        # handle suicides
+        is_suicide = not empty_neighbors and (
+            not friendly_neighboring_group_ids
+            or all(len(self.groups[fr].liberties) == 1 for fr in friendly_neighboring_group_ids)
+        )
+
         new_group = self._merge_from_played(
             color, c, empty_neighbors, friendly_neighboring_group_ids
         )
+
+        if is_suicide:
+            captured_stones = self._capture_group(new_group.id)
+            self._handle_captures(captured_stones)
+            return captured_stones
 
         # new_group becomes stale as _update_liberties and
         # _handle_captures are called; must refetch with self.groups[new_group.id]
@@ -105,7 +115,6 @@ class LibertyTracker:
                 self._update_liberties(group_id, remove={c})
 
         self._handle_captures(captured_stones)
-
         return captured_stones
 
     def _merge_from_played(self, color, played, libs, other_group_ids):
